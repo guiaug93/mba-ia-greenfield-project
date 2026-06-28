@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, QueryFailedError } from 'typeorm';
 import { appendRandomSuffix, sanitizeNickname } from './nickname.util';
 import { Channel } from './entities/channel.entity';
@@ -20,6 +20,16 @@ function isPgUniqueViolationOnColumn(err: unknown, column: string): boolean {
 @Injectable()
 export class ChannelsService {
   constructor(private readonly dataSource: DataSource) {}
+
+  async findByUserId(userId: string): Promise<Channel> {
+    const channel = await this.dataSource.manager.findOne(Channel, {
+      where: { user_id: userId },
+    });
+    if (!channel) {
+      throw new NotFoundException('Channel not found');
+    }
+    return channel;
+  }
 
   async createChannel(userId: string, email: string): Promise<Channel> {
     const baseNickname = sanitizeNickname(email.split('@')[0]);
