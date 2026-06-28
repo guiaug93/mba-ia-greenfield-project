@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, QueryFailedError } from 'typeorm';
 import { appendRandomSuffix, sanitizeNickname } from './nickname.util';
 import { Channel } from './entities/channel.entity';
@@ -21,6 +21,16 @@ function isPgUniqueViolationOnColumn(err: unknown, column: string): boolean {
 export class ChannelsService {
   constructor(private readonly dataSource: DataSource) {}
 
+  async findByUserId(userId: string): Promise<Channel> {
+    const channel = await this.dataSource.manager.findOne(Channel, {
+      where: { user_id: userId },
+    });
+    if (!channel) {
+      throw new NotFoundException('Channel not found');
+    }
+    return channel;
+  }
+
   async createChannel(userId: string, email: string): Promise<Channel> {
     const baseNickname = sanitizeNickname(email.split('@')[0]);
 
@@ -28,7 +38,9 @@ export class ChannelsService {
       let nickname = baseNickname;
 
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        const existing = await manager.findOne(Channel, { where: { nickname } });
+        const existing = await manager.findOne(Channel, {
+          where: { nickname },
+        });
         if (existing) {
           nickname = appendRandomSuffix(baseNickname);
           continue;
