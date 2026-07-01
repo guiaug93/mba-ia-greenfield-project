@@ -1,17 +1,16 @@
 import {
   S3Client,
-  GetObjectCommand,
   HeadObjectCommand,
   CreateBucketCommand,
   ListObjectsV2Command,
   DeleteObjectCommand,
   UploadPartCommand,
 } from '@aws-sdk/client-s3';
-import { writeFileSync, unlinkSync, readFileSync } from 'fs';
+import { unlinkSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { Test } from '@nestjs/testing';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigType } from '@nestjs/config';
 import storageConfig from '../config/storage.config';
 import { StorageService } from './storage.service';
 import { S3_CLIENT } from './storage.constants';
@@ -35,7 +34,7 @@ describe('StorageService (integration)', () => {
         {
           provide: S3_CLIENT,
           inject: [storageConfig.KEY],
-          useFactory: (config: any) =>
+          useFactory: (config: ConfigType<typeof storageConfig>) =>
             new S3Client({
               endpoint: `http://${config.endpoint}:${config.port}`,
               region: 'us-east-1',

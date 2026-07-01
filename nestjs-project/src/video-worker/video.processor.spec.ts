@@ -5,6 +5,8 @@ import { VideosService } from '../videos/videos.service';
 import { StorageService } from '../storage/storage.service';
 import { Video, VideoStatus } from '../videos/entities/video.entity';
 
+/* eslint-disable @typescript-eslint/unbound-method, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
+
 const mockVideo: Video = {
   id: 'video-id',
   channelId: 'channel-id',
@@ -40,36 +42,35 @@ describe('VideoProcessor', () => {
   let mockExecFile: jest.Mock;
 
   beforeEach(async () => {
+    // eslint-disable-next-line
     mockExecFile = require('child_process').execFile as jest.Mock;
 
     // Reset mock to default success behavior
     // promisify(execFile) passes callback as last arg: (err, result) => {}
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _cb: Function) => {
-        if (_cmd === 'ffprobe') {
-          _cb(null, {
-            stdout: JSON.stringify({
-              format: {
-                duration: '123.456',
-                size: '1048576',
-                bit_rate: '256000',
-                format_name: 'mp4',
+    mockExecFile.mockImplementation((cmd, _args, cb) => {
+      if (cmd === 'ffprobe') {
+        cb(null, {
+          stdout: JSON.stringify({
+            format: {
+              duration: '123.456',
+              size: '1048576',
+              bit_rate: '256000',
+              format_name: 'mp4',
+            },
+            streams: [
+              {
+                codec_type: 'video',
+                codec_name: 'h264',
+                width: 1920,
+                height: 1080,
               },
-              streams: [
-                {
-                  codec_type: 'video',
-                  codec_name: 'h264',
-                  width: 1920,
-                  height: 1080,
-                },
-              ],
-            }),
-          });
-        } else {
-          _cb(null, { stdout: '' });
-        }
-      },
-    );
+            ],
+          }),
+        });
+      } else {
+        cb(null, { stdout: '' });
+      }
+    });
 
     const module = await Test.createTestingModule({
       providers: [
@@ -126,11 +127,9 @@ describe('VideoProcessor', () => {
     });
 
     it('should handle processing errors gracefully', async () => {
-      mockExecFile.mockImplementation(
-        (_cmd: string, _args: string[], _cb: Function) => {
-          _cb(new Error('FFprobe failed'));
-        },
-      );
+      mockExecFile.mockImplementation((_cmd, _args, cb) => {
+        cb(new Error('FFprobe failed'));
+      });
 
       videosService.findById.mockResolvedValue(mockVideo);
 
