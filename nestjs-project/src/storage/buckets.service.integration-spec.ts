@@ -4,7 +4,7 @@ import {
   ListBucketsCommand,
 } from '@aws-sdk/client-s3';
 import { Test } from '@nestjs/testing';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigType } from '@nestjs/config';
 import storageConfig from '../config/storage.config';
 import { S3_CLIENT } from './storage.constants';
 import { BucketsService } from './buckets.service';
@@ -26,7 +26,7 @@ describe('BucketsService (integration)', () => {
         {
           provide: S3_CLIENT,
           inject: [storageConfig.KEY],
-          useFactory: (config: any) =>
+          useFactory: (config: ConfigType<typeof storageConfig>) =>
             new S3Client({
               endpoint: `http://${config.endpoint}:${config.port}`,
               region: 'us-east-1',

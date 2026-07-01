@@ -1,18 +1,16 @@
-import * as crypto from 'crypto';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { DataSource, Repository } from 'typeorm';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { MailService } from '../src/mail/mail.service';
-import { User } from '../src/users/entities/user.entity';
-import { Video, VideoStatus } from '../src/videos/entities/video.entity';
+import { VideoStatus } from '../src/videos/entities/video.entity';
 import { DomainExceptionFilter } from '../src/common/filters/domain-exception.filter';
 import { ValidationExceptionFilter } from '../src/common/filters/validation-exception.filter';
 import { cleanAllTables } from '../src/test/create-test-data-source';
+
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 
 const TEST_PASSWORD = 'Test123!@#';
 let testCounter = 0;
@@ -20,7 +18,6 @@ let testCounter = 0;
 describe('Videos (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
-  let videoRepository: Repository<Video>;
 
   const createUserAndChannel = async (): Promise<{
     token: string;
@@ -86,7 +83,6 @@ describe('Videos (e2e)', () => {
     await app.init();
 
     dataSource = moduleFixture.get(DataSource);
-    videoRepository = dataSource.getRepository(Video);
   });
 
   afterAll(async () => {
@@ -104,7 +100,11 @@ describe('Videos (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/videos')
         .set('Authorization', `Bearer ${token}`)
-        .send({ title: 'Test Video E2E', mimeType: 'video/mp4', fileSize: 1000 });
+        .send({
+          title: 'Test Video E2E',
+          mimeType: 'video/mp4',
+          fileSize: 1000,
+        });
 
       expect(res.status).toBe(201);
       expect(res.body.id).toBeDefined();
@@ -112,9 +112,11 @@ describe('Videos (e2e)', () => {
     });
 
     it('should reject unauthenticated requests', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/videos')
-        .send({ title: 'Unauthenticated Video', mimeType: 'video/mp4', fileSize: 1000 });
+      const res = await request(app.getHttpServer()).post('/videos').send({
+        title: 'Unauthenticated Video',
+        mimeType: 'video/mp4',
+        fileSize: 1000,
+      });
 
       expect(res.status).toBe(401);
     });
@@ -174,7 +176,12 @@ describe('Videos (e2e)', () => {
         .post(`/videos/${videoId}/complete`)
         .set('Authorization', `Bearer ${token}`)
         .send({
-          parts: [{ partNumber: 1, etag: uploadRes.headers.get('etag')?.replace(/"/g, '') }],
+          parts: [
+            {
+              partNumber: 1,
+              etag: uploadRes.headers.get('etag')?.replace(/"/g, ''),
+            },
+          ],
         });
 
       // POST returns 201 (Created) by default in NestJS
@@ -188,8 +195,7 @@ describe('Videos (e2e)', () => {
       const { token } = await createUserAndChannel();
       const videoId = await createVideo(token);
 
-      const res = await request(app.getHttpServer())
-        .get(`/videos/${videoId}`);
+      const res = await request(app.getHttpServer()).get(`/videos/${videoId}`);
 
       expect(res.status).toBe(200);
       expect(res.body.id).toBe(videoId);
@@ -198,8 +204,9 @@ describe('Videos (e2e)', () => {
     });
 
     it('should return 404 for non-existent video', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/videos/00000000-0000-0000-0000-000000000000');
+      const res = await request(app.getHttpServer()).get(
+        '/videos/00000000-0000-0000-0000-000000000000',
+      );
 
       expect(res.status).toBe(404);
     });
@@ -210,8 +217,9 @@ describe('Videos (e2e)', () => {
       const { token } = await createUserAndChannel();
       const videoId = await createVideo(token);
 
-      const res = await request(app.getHttpServer())
-        .get(`/videos/${videoId}/stream`);
+      const res = await request(app.getHttpServer()).get(
+        `/videos/${videoId}/stream`,
+      );
 
       expect(res.status).toBe(409);
     });
@@ -222,8 +230,9 @@ describe('Videos (e2e)', () => {
       const { token } = await createUserAndChannel();
       const videoId = await createVideo(token);
 
-      const res = await request(app.getHttpServer())
-        .get(`/videos/${videoId}/thumbnail`);
+      const res = await request(app.getHttpServer()).get(
+        `/videos/${videoId}/thumbnail`,
+      );
 
       expect(res.status).toBe(200);
       expect(res.body.thumbnailUrl).toBeNull();
