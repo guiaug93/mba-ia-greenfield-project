@@ -1,11 +1,10 @@
 import { Job } from 'bullmq';
 import { Test } from '@nestjs/testing';
+import * as childProcessModule from 'child_process';
 import { VideoProcessor } from './video.processor';
 import { VideosService } from '../videos/videos.service';
 import { StorageService } from '../storage/storage.service';
 import { Video, VideoStatus } from '../videos/entities/video.entity';
-
-/* eslint-disable @typescript-eslint/unbound-method, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
 
 const mockVideo: Video = {
   id: 'video-id',
@@ -39,38 +38,69 @@ describe('VideoProcessor', () => {
   let processor: VideoProcessor;
   let videosService: jest.Mocked<VideosService>;
   let storageService: jest.Mocked<StorageService>;
-  let mockExecFile: jest.Mock;
+
+  const setupMockSuccess = () => {
+    const mockExec = childProcessModule.execFile as unknown as jest.Mock;
+    mockExec.mockImplementation(
+      (
+        _file: string,
+        _args: string[] | null | undefined,
+        _optionsOrCb: unknown,
+        _cb?: unknown,
+      ) => {
+        const callback = (
+          typeof _optionsOrCb === 'function' ? _optionsOrCb : _cb
+        ) as ((err: Error | null, result?: { stdout: string }) => void) | null;
+        if (callback) {
+          if (_file === 'ffprobe') {
+            callback(null, {
+              stdout: JSON.stringify({
+                format: {
+                  duration: '123.456',
+                  size: '1048576',
+                  bit_rate: '256000',
+                  format_name: 'mp4',
+                },
+                streams: [
+                  {
+                    codec_type: 'video',
+                    codec_name: 'h264',
+                    width: 1920,
+                    height: 1080,
+                  },
+                ],
+              }),
+            });
+          } else {
+            callback(null, { stdout: '' });
+          }
+        }
+      },
+    );
+  };
+
+  const setupMockError = () => {
+    const mockExec = childProcessModule.execFile as unknown as jest.Mock;
+    mockExec.mockImplementation(
+      (
+        _file: string,
+        _args: string[] | null | undefined,
+        _optionsOrCb: unknown,
+        _cb?: unknown,
+      ) => {
+        const callback = (
+          typeof _optionsOrCb === 'function' ? _optionsOrCb : _cb
+        ) as ((err: Error | null, result?: { stdout: string }) => void) | null;
+        if (callback) {
+          callback(new Error('FFprobe failed'));
+        }
+      },
+    );
+  };
 
   beforeEach(async () => {
-    // eslint-disable-next-line
-    mockExecFile = require('child_process').execFile as jest.Mock;
-
-    // Reset mock to default success behavior
-    // promisify(execFile) passes callback as last arg: (err, result) => {}
-    mockExecFile.mockImplementation((cmd, _args, cb) => {
-      if (cmd === 'ffprobe') {
-        cb(null, {
-          stdout: JSON.stringify({
-            format: {
-              duration: '123.456',
-              size: '1048576',
-              bit_rate: '256000',
-              format_name: 'mp4',
-            },
-            streams: [
-              {
-                codec_type: 'video',
-                codec_name: 'h264',
-                width: 1920,
-                height: 1080,
-              },
-            ],
-          }),
-        });
-      } else {
-        cb(null, { stdout: '' });
-      }
-    });
+    jest.clearAllMocks();
+    setupMockSuccess();
 
     const module = await Test.createTestingModule({
       providers: [
@@ -105,7 +135,7 @@ describe('VideoProcessor', () => {
         ...mockVideo,
         status: VideoStatus.READY,
         duration: 123,
-        metadata: {} as any,
+        metadata: {} as unknown as Record<string, unknown>,
         thumbnailKey: 'thumbnails/video-id/thumbnail.jpg',
         fileSize: 1048576,
       });
@@ -127,9 +157,8 @@ describe('VideoProcessor', () => {
     });
 
     it('should handle processing errors gracefully', async () => {
-      mockExecFile.mockImplementation((_cmd, _args, cb) => {
-        cb(new Error('FFprobe failed'));
-      });
+      jest.clearAllMocks();
+      setupMockError();
 
       videosService.findById.mockResolvedValue(mockVideo);
 

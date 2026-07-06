@@ -1,6 +1,5 @@
 import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
-import { S3Client } from '@aws-sdk/client-s3';
 import storageConfig from '../config/storage.config';
 import { S3_CLIENT } from './storage.constants';
 import { StorageModule } from './storage.module';
@@ -17,7 +16,7 @@ describe('StorageModule', () => {
       ],
     })
       .overrideProvider(S3_CLIENT)
-      .useValue({} as S3Client)
+      .useValue({})
       .compile();
 
     expect(module).toBeDefined();

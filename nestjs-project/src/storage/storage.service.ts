@@ -76,12 +76,10 @@ export class StorageService {
       Key: key,
       UploadId: uploadId,
       MultipartUpload: {
-        Parts: parts.map(
-          (p): CompletedPart => ({
-            PartNumber: p.partNumber,
-            ETag: p.etag,
-          }),
-        ),
+        Parts: parts.map((p): CompletedPart => ({
+          PartNumber: p.partNumber,
+          ETag: p.etag,
+        })),
       },
     });
     await this.s3Client.send(command);

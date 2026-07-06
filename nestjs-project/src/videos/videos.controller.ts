@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  Redirect,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -89,6 +90,7 @@ export class VideosController {
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/complete')
+  @HttpCode(HttpStatus.OK)
   async completeUpload(
     @Param('id') id: string,
     @Body() body: { parts: { partNumber: number; etag: string }[] },
@@ -149,6 +151,8 @@ export class VideosController {
 
   @Public()
   @Get(':id/stream')
+  @Redirect()
+  @HttpCode(HttpStatus.FOUND)
   async stream(@Param('id') id: string) {
     const video = await this.videosService.findById(id);
     this.videosService.assertStatus(video, [VideoStatus.READY]);
@@ -157,11 +161,13 @@ export class VideosController {
       video.fileKey!,
       3600,
     );
-    return { url };
+    return { url, statusCode: HttpStatus.FOUND };
   }
 
   @Public()
   @Get(':id/download')
+  @Redirect()
+  @HttpCode(HttpStatus.FOUND)
   async download(@Param('id') id: string) {
     const video = await this.videosService.findById(id);
     this.videosService.assertStatus(video, [VideoStatus.READY]);
@@ -171,7 +177,7 @@ export class VideosController {
       3600,
       `${video.title}.mp4`,
     );
-    return { url };
+    return { url, statusCode: HttpStatus.FOUND };
   }
 
   @Public()
