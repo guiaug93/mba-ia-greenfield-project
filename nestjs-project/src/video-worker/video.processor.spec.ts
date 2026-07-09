@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { Job } from 'bullmq';
 import { Test } from '@nestjs/testing';
 import * as childProcessModule from 'child_process';
