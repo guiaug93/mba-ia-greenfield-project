@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  Redirect,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -19,6 +20,8 @@ import { VideosService } from './videos.service';
 import { ChannelsService } from '../channels/channels.service';
 import { StorageService } from '../storage/storage.service';
 import { VideoStatus } from './entities/video.entity';
+import { CreateVideoDto } from './dto/create-video.dto';
+import { CompleteUploadDto } from './dto/complete-upload.dto';
 
 @Controller('videos')
 export class VideosController {
@@ -32,10 +35,7 @@ export class VideosController {
   @UseGuards(JwtAuthGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(
-    @Body() body: { title: string; mimeType: string; fileSize: number },
-    @CurrentUser() user: JwtPayload,
-  ) {
+  async create(@Body() body: CreateVideoDto, @CurrentUser() user: JwtPayload) {
     const channel = await this.channelsService.findByUserId(user.sub);
     const video = await this.videosService.create(
       channel.id,
@@ -89,9 +89,10 @@ export class VideosController {
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/complete')
+  @HttpCode(HttpStatus.OK)
   async completeUpload(
     @Param('id') id: string,
-    @Body() body: { parts: { partNumber: number; etag: string }[] },
+    @Body() body: CompleteUploadDto,
     @CurrentUser() user: JwtPayload,
   ) {
     const channel = await this.channelsService.findByUserId(user.sub);
@@ -149,6 +150,8 @@ export class VideosController {
 
   @Public()
   @Get(':id/stream')
+  @Redirect()
+  @HttpCode(HttpStatus.FOUND)
   async stream(@Param('id') id: string) {
     const video = await this.videosService.findById(id);
     this.videosService.assertStatus(video, [VideoStatus.READY]);
@@ -157,11 +160,13 @@ export class VideosController {
       video.fileKey!,
       3600,
     );
-    return { url };
+    return { url, statusCode: HttpStatus.FOUND };
   }
 
   @Public()
   @Get(':id/download')
+  @Redirect()
+  @HttpCode(HttpStatus.FOUND)
   async download(@Param('id') id: string) {
     const video = await this.videosService.findById(id);
     this.videosService.assertStatus(video, [VideoStatus.READY]);
@@ -171,7 +176,7 @@ export class VideosController {
       3600,
       `${video.title}.mp4`,
     );
-    return { url };
+    return { url, statusCode: HttpStatus.FOUND };
   }
 
   @Public()

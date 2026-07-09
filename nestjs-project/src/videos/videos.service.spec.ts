@@ -1,7 +1,10 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  VideoNotFoundException,
+  InvalidVideoStatusException,
+} from '../common/exceptions/domain.exception';
 import { Video, VideoStatus } from './entities/video.entity';
 import { VideosService } from './videos.service';
 
@@ -86,7 +89,7 @@ describe('VideosService', () => {
       repo.findOne.mockResolvedValue(null);
 
       await expect(service.findById('invalid-id')).rejects.toThrow(
-        NotFoundException,
+        VideoNotFoundException,
       );
     });
   });
@@ -124,7 +127,7 @@ describe('VideosService', () => {
     it('should throw when status is not allowed', () => {
       const video = createMockVideo();
       expect(() => service.assertStatus(video, [VideoStatus.READY])).toThrow(
-        ConflictException,
+        InvalidVideoStatusException,
       );
     });
   });
@@ -136,7 +139,7 @@ describe('VideosService', () => {
 
       await expect(
         service.ensureOwnership('video-id', 'wrong-channel'),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(VideoNotFoundException);
     });
 
     it('should return video when channel matches', async () => {

@@ -1,11 +1,11 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Video, VideoStatus } from './entities/video.entity';
+import {
+  VideoNotFoundException,
+  InvalidVideoStatusException,
+} from '../common/exceptions/domain.exception';
 
 @Injectable()
 export class VideosService {
@@ -36,7 +36,7 @@ export class VideosService {
       relations: ['channel'],
     });
     if (!video) {
-      throw new NotFoundException('Video not found');
+      throw new VideoNotFoundException();
     }
     return video;
   }
@@ -98,16 +98,14 @@ export class VideosService {
   async ensureOwnership(videoId: string, channelId: string): Promise<Video> {
     const video = await this.findById(videoId);
     if (video.channelId !== channelId) {
-      throw new NotFoundException('Video not found');
+      throw new VideoNotFoundException();
     }
     return video;
   }
 
   assertStatus(video: Video, allowedStatuses: VideoStatus[]): void {
     if (!allowedStatuses.includes(video.status)) {
-      throw new ConflictException(
-        `Video status '${video.status}' does not allow this operation`,
-      );
+      throw new InvalidVideoStatusException(video.status);
     }
   }
 }

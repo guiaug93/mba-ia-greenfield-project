@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -184,8 +185,7 @@ describe('Videos (e2e)', () => {
           ],
         });
 
-      // POST returns 201 (Created) by default in NestJS
-      expect(completeRes.status).toBe(201);
+      expect(completeRes.status).toBe(200);
       expect(completeRes.body.status).toBe(VideoStatus.PROCESSING);
     });
   });

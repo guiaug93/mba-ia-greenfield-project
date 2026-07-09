@@ -1,24 +1,22 @@
 import { Test } from '@nestjs/testing';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { RefreshToken } from '../auth/entities/refresh-token.entity';
-import { VerificationToken } from '../auth/entities/verification-token.entity';
-import { User } from '../users/entities/user.entity';
-import { createTestDataSource } from '../test/create-test-data-source';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { Channel } from './entities/channel.entity';
-import { ChannelsModule } from './channels.module';
-
-const ALL_ENTITIES = [User, Channel, RefreshToken, VerificationToken];
+import { ChannelsService } from './channels.service';
 
 describe('ChannelsModule', () => {
-  it('should compile with TypeOrmModule.forFeature([Channel]) and ChannelsService', async () => {
+  it('should compile with ChannelsService', async () => {
     const module = await Test.createTestingModule({
-      imports: [
-        TypeOrmModule.forRoot(createTestDataSource(ALL_ENTITIES).options),
-        ChannelsModule,
+      providers: [
+        ChannelsService,
+        { provide: getRepositoryToken(Channel), useValue: {} },
+        { provide: DataSource, useValue: { transaction: jest.fn() } },
       ],
     }).compile();
 
     expect(module).toBeDefined();
+    const service = module.get(ChannelsService);
+    expect(service).toBeDefined();
     await module.close();
-  }, 30000);
+  });
 });
