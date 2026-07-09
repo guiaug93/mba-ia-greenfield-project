@@ -33,24 +33,16 @@ docker compose exec nestjs-api npm run start:dev
 
 Services:
 - `nestjs-api` — NestJS API, port `3000`
+- `video-worker` — BullMQ worker (FFmpeg/ffprobe), processes `video-processing` queue
 - `db` — PostgreSQL 17, port `5432`, database `streamtube`, user/password `streamtube`
+- `mailpit` — SMTP + web UI, ports `1025` (SMTP) and `8025` (web)
+- `redis` — Redis 7 (Alpine), port `6379`, BullMQ backend
+- `minio` — S3-compatible object storage, ports `9000` (API) and `9001` (console)
 
-All verification and teardown commands run on the **host machine**:
-
-```bash
-# Verify NestJS is running (expect 200 + "Hello World!")
-curl http://localhost:3000
-
-# Verify PostgreSQL is ready (runs inside the db container)
-docker compose exec db pg_isready -U streamtube
-
-# Check container logs
-docker compose logs nestjs-api
-docker compose logs db
-
-# Tear down the entire environment
-docker compose down
-```
+After starting infrastructure, verify each service:
+- **PostgreSQL:** `docker compose exec db pg_isready -U streamtube` — expect `accepting connections`
+- **Redis:** `docker compose exec redis redis-cli ping` — expect `PONG`
+- **MinIO:** `curl http://localhost:9000/minio/health/live` — expect 200
 
 ## Commands
 
@@ -78,8 +70,11 @@ npm run format                           # Prettier formatting
 ```bash
 docker compose ps
 docker compose logs nestjs-api
+docker compose logs video-worker
 docker compose exec db pg_isready -U streamtube
+docker compose exec redis redis-cli ping
 curl http://localhost:3000
+curl http://localhost:9000/minio/health/live
 ```
 
 ### Test execution
@@ -159,3 +154,46 @@ NestJS with standard module structure. Source lives in `src/`, compiled output i
 ## REST Conventions
 
 This is a RESTful API. All endpoints must follow standard REST conventions — correct HTTP methods, proper status codes, plural resource nouns, and consistent URL structure. Details are enforced via rules on controller files.
+
+## Videos Module
+
+The Videos module implements the full video upload and processing pipeline (Phase 03).
+
+### Upload Flow (zero data through API)
+
+1. `POST /videos` — creates video record (status: `pending`), returns `id`
+2. `POST /videos/:id/init-upload` — initializes multipart upload in MinIO, stores `uploadId` + `fileKey`
+3. `GET /videos/:id/upload-urls?partCount=N` — returns N presigned PUT URLs (50MB each)
+4. Client uploads parts directly to MinIO via presigned URLs
+5. `POST /videos/:id/complete` — completes multipart, adds job to BullMQ, transitions to `processing`
+6. **Video Worker** (FFmpeg) — downloads from MinIO, extracts metadata (ffprobe), generates thumbnail (ffmpeg), uploads thumbnail, updates DB to `ready`
+
+### Video Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/videos` | Required | Create video record (pending) |
+| POST | `/videos/:id/init-upload` | Required | Init multipart upload |
+| GET | `/videos/:id/upload-urls` | Required | Get presigned part URLs |
+| POST | `/videos/:id/complete` | Required | Complete multipart, start processing |
+| POST | `/videos/:id/abort` | Required | Abort multipart upload |
+| GET | `/videos/:id` | Public | Get video metadata |
+| GET | `/videos/:id/stream` | Public | 302 redirect to presigned streaming URL |
+| GET | `/videos/:id/download` | Public | 302 redirect to presigned download URL |
+| GET | `/videos/:id/thumbnail` | Public | Get thumbnail presigned URL (or null) |
+
+### Status Lifecycle
+
+`pending` → `processing` → `ready` | `error`
+
+### Video Worker
+
+- BullMQ consumer in a **separate Docker container** (`video-worker`)
+- Uses FFmpeg + FFprobe compiled into the container
+- Process: download from MinIO → ffprobe metadata → ffmpeg thumbnail (1280x720) → upload thumbnail → update DB status to `ready`
+
+### Storage Module
+
+- Abstraction over `@aws-sdk/client-s3` with MinIO (compatible with S3 API)
+- Supports: single file upload/download, multipart lifecycle (init, presigned part URLs, complete, abort), presigned GET URLs, object metadata
+- Uses `forcePathStyle: true` for MinIO compatibility

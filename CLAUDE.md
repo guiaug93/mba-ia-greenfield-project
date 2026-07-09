@@ -10,7 +10,16 @@ More info in the project overview: [docs/project-plan.md](docs/project-plan.md)
 
 This is a monorepo with two main areas:
 
-- `nestjs-project/` — Backend API (NestJS 11, TypeScript, Express). Contains modules for users, channels, videos, comments, etc.
+- `nestjs-project/` — Backend API (NestJS 11, TypeScript, Express). Contains modules for:
+
+  - **Auth** – register, login, JWT refresh, email verification, password reset
+  - **Users** – user entity and profile
+  - **Channels** – channel auto-creation on signup, nickname conflict resolution
+  - **Videos** – full lifecycle: create → init-upload → upload (presigned multipart) → complete → process (FFmpeg worker) → stream/download
+  - **Storage** – MinIO/S3 abstraction with multipart presigned URLs and bucket management
+  - **Video Worker** – BullMQ consumer that downloads from MinIO, runs ffprobe/ffmpeg, uploads thumbnail, updates DB
+  - **Mail** – email sending via SMTP (mailpit in dev)
+
 - `docs/` — Project documentation, architecture diagrams, and planning.
 - `next-frontend/` (Next.js) — not yet initialized
 
@@ -20,11 +29,52 @@ See `docs/diagrams/software-arch.mermaid` for the full diagram. Key containers:
 
 - **Frontend** (Next.js) → calls API via REST, streams from Object Storage
 - **API** (Nest.js) → business rules, auth, reads/writes DB, uploads to storage, publishes jobs to queue, sends emails
-- **Video Worker** (FFmpeg) → consumes jobs from queue, processes videos, updates DB and storage
+- **Video Worker** (FFmpeg) → consumes jobs from BullMQ queue, downloads video from MinIO, runs ffprobe + ffmpeg, uploads thumbnail, updates DB
 - **Database** (PostgreSQL) → users, channels, videos, comments, likes
-- **Object Storage** (S3/MinIO) → video files and thumbnails
-- **Message Queue** (TBD) → video processing job queue
-- **Email Service** (SMTP) → account confirmation and password recovery
+- **Object Storage** (S3/MinIO) → video files (multipart uploads) and thumbnails
+- **Message Queue** (Redis/BullMQ) → video processing job queue (`video-processing` queue)
+- **Email Service** (mailpit/SMTP) → account confirmation and password recovery
+
+## Videos Module Overview
+
+### Upload Flow (zero data through API)
+
+1. `POST /videos` – creates video record (status: `pending`), returns `id`
+2. `POST /videos/:id/init-upload` – initializes multipart upload in MinIO, stores `uploadId` + `fileKey`
+3. `GET /videos/:id/upload-urls?partCount=N` – returns N presigned PUT URLs (50MB each)
+4. Client uploads parts directly to MinIO via presigned URLs
+5. `POST /videos/:id/complete` – completes multipart, adds job to BullMQ, transitions to `processing`
+6. **Video Worker** (FFmpeg) – downloads from MinIO, extracts metadata (ffprobe), generates thumbnail (ffmpeg), uploads thumbnail, updates DB to `ready`
+
+### Video Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/videos` | Required | Create video record (pending) |
+| POST | `/videos/:id/init-upload` | Required | Init multipart upload |
+| GET | `/videos/:id/upload-urls` | Required | Get presigned part URLs |
+| POST | `/videos/:id/complete` | Required | Complete multipart, start processing |
+| POST | `/videos/:id/abort` | Required | Abort multipart upload |
+| GET | `/videos/:id` | Public | Get video metadata |
+| GET | `/videos/:id/stream` | Public | Redirect to presigned streaming URL |
+| GET | `/videos/:id/download` | Public | Redirect to presigned download URL |
+| GET | `/videos/:id/thumbnail` | Public | Get thumbnail presigned URL (or null) |
+
+### Status Lifecycle
+
+`pending` → `processing` → `ready` | `error`
+
+### Video Worker
+
+- BullMQ consumer in a **separate Docker container** (`video-worker`)
+- Uses FFmpeg + FFprobe compiled into the container
+- Process: download from MinIO → ffprobe metadata → ffmpeg thumbnail (1280x720) → upload thumbnail → update DB status to `ready`
+
+### Storage Module
+
+- Abstraction over `@aws-sdk/client-s3` with MinIO (compatible with S3 API)
+- Supports: single file upload/download, multipart lifecycle (init, presigned part URLs, complete, abort), presigned GET URLs, object metadata
+- Uses `forcePathStyle: true` for MinIO compatibility
 
 ## Docker Networking
 
