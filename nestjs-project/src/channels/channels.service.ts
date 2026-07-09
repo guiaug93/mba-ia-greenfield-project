@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DataSource, QueryFailedError } from 'typeorm';
 import { appendRandomSuffix, sanitizeNickname } from './nickname.util';
 import { Channel } from './entities/channel.entity';
+import { ChannelNotFoundException } from '../common/exceptions/domain.exception';
 
 const PG_UNIQUE_VIOLATION = '23505';
 const NICKNAME_COLUMN = 'nickname';
@@ -26,7 +27,7 @@ export class ChannelsService {
       where: { user_id: userId },
     });
     if (!channel) {
-      throw new NotFoundException('Channel not found');
+      throw new ChannelNotFoundException();
     }
     return channel;
   }

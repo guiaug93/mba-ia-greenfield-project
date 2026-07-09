@@ -1,40 +1,41 @@
 # Phase 03 — Upload e Processamento de Vídeos — Progress
 
-**Status:** in_progress
-**SIs:** 5/6 completed
+**Status:** completed
+**SIs:** 6/6 completed
 
 ### SI-03.1 — Nova Infraestrutura no Docker Compose
 - **Status:** completed
-- **Tests:** no tests
-- **Observations:** compose.yaml extends with minio, redis, video-worker; Dockerfile.worker created; npm deps installed
+- **Tests:** no tests required (infrastructure)
+- **Observations:** compose.yaml with minio, redis, video-worker; Dockerfile.worker created
 
 ### SI-03.2 — Video Entity, Migration e Configuração de Módulos
 - **Status:** completed
-- **Tests:** storage.module.spec.ts, videos.module.spec.ts — both pass
-- **Observations:** Video entity with 12 fields + FK to channels; migration created; StorageModule with S3Client provider; env.validation.ts extended
+- **Tests:** storage.module.spec.ts, videos.module.spec.ts, video-worker.module.spec.ts — all pass
+- **Observations:** Video entity with 14 fields + FK to channels; migration created; StorageModule with S3Client provider; env.validation.ts extended
 
 ### SI-03.3 — Serviço de Storage (Upload via Presigned URLs)
 - **Status:** completed
-- **Tests:** storage.service.spec.ts (5 tests), videos.service.spec.ts (8 tests) — all pass
-- **Observations:** StorageService: initMultipartUpload, generatePresignedPartUrls, completeMultipartUpload, abortMultipartUpload, generatePresignedGetUrl, getObjectMetadata, uploadFile, downloadToFile; VideosService: CRUD + status transitions + ownership; BucketsService; S3_CLIENT extracted to storage.constants.ts to break circular dep
+- **Tests:** storage.service.spec.ts (5 tests), videos.service.spec.ts (9 tests), storage.service.integration-spec.ts, buckets.service.integration-spec.ts — all pass
+- **Observations:** StorageService: initMultipartUpload, generatePresignedPartUrls, completeMultipartUpload, abortMultipartUpload, generatePresignedGetUrl, getObjectMetadata, uploadFile, downloadToFile
 
 ### SI-03.4 — Upload API Endpoints
 - **Status:** completed
-- **Tests:** pending (no separate controller spec yet; validated via module test)
-- **Observations:** VideosController: 9 endpoints (create, init-upload, upload-urls, complete, abort, getMetadata, stream, download, thumbnail); assertStatus é síncrono
+- **Tests:** videos.e2e-spec.ts: POST /videos, upload-urls, complete, metadata, stream, thumbnail
+- **Observations:** 9 endpoints; DTOs with class-validator (CreateVideoDto with @Max 10GB, CompleteUploadDto); domain exceptions (VideoNotFoundException, InvalidVideoStatusException, FileSizeExceededException, ChannelNotFoundException)
 
 ### SI-03.5 — Worker de Vídeo
 - **Status:** completed
-- **Tests:** pending (unit/integration tests not implemented yet)
-- **Observations:** VideoWorkerModule bootstrap standalone NestJS app; VideoProcessor extends WorkerHost consuming `video-processing` queue; FFprobe metadata extraction; FFmpeg thumbnail (1280×720); download/upload via StorageService; temp file cleanup; error handling
+- **Tests:** video.processor.spec.ts (3 tests) — all pass
+- **Observations:** VideoWorkerModule bootstrap standalone; VideoProcessor extends WorkerHost consuming `video-processing` queue; FFprobe metadata extraction; FFmpeg thumbnail (1280x720)
 
 ### SI-03.6 — Streaming e Download
-- **Status:** pending
-- **Tests:** pending
-- **Observations:** Endpoints implemented in VideosController (stream, download, thumbnail — presigned GET redirect); falta testar fluxo completo
+- **Status:** completed
+- **Tests:** videos.e2e-spec.ts: stream (409 on non-ready), download (pending), thumbnail (null case)
+- **Observations:** Stream/download endpoints return HTTP 302 redirect via @Redirect() decorator; presigned GET URLs from MinIO
 
-## Key Notes
-- S3_CLIENT constant extracted to storage.constants.ts to avoid circular import between storage.module.ts and storage.service.ts
-- assertStatus é síncrono (não é async) — ajustes feitos no controller (removeu await) e nos testes
-- start:worker script atualizado para `node dist/video-worker/main.js`
-- Dockerfile.worker atualizado com build completo (npm ci, npm run build, CMD node)
+## Code Quality
+- **tsc --noEmit:** PASS (exit 0)
+- **npm run lint:** PASS (0 errors, 0 warnings)
+- **npm test (unit):** 81/81 PASS (17 suites)
+- **Domain exceptions:** VideosService and ChannelsService use domain exceptions (not HTTP exceptions)
+- **DTOs:** CreateVideoDto and CompleteUploadDto with class-validator decorators

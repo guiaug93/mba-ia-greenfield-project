@@ -20,6 +20,8 @@ import { VideosService } from './videos.service';
 import { ChannelsService } from '../channels/channels.service';
 import { StorageService } from '../storage/storage.service';
 import { VideoStatus } from './entities/video.entity';
+import { CreateVideoDto } from './dto/create-video.dto';
+import { CompleteUploadDto } from './dto/complete-upload.dto';
 
 @Controller('videos')
 export class VideosController {
@@ -33,10 +35,7 @@ export class VideosController {
   @UseGuards(JwtAuthGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(
-    @Body() body: { title: string; mimeType: string; fileSize: number },
-    @CurrentUser() user: JwtPayload,
-  ) {
+  async create(@Body() body: CreateVideoDto, @CurrentUser() user: JwtPayload) {
     const channel = await this.channelsService.findByUserId(user.sub);
     const video = await this.videosService.create(
       channel.id,
@@ -93,7 +92,7 @@ export class VideosController {
   @HttpCode(HttpStatus.OK)
   async completeUpload(
     @Param('id') id: string,
-    @Body() body: { parts: { partNumber: number; etag: string }[] },
+    @Body() body: CompleteUploadDto,
     @CurrentUser() user: JwtPayload,
   ) {
     const channel = await this.channelsService.findByUserId(user.sub);
