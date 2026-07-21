@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { Video } from '../videos/entities/video.entity';
 import { Channel } from '../channels/entities/channel.entity';
+import { User } from '../users/entities/user.entity';
 import { VideosService } from '../videos/videos.service';
 import { StorageModule } from '../storage/storage.module';
 import databaseConfig from '../config/database.config';
@@ -55,7 +56,7 @@ import { VideoProcessor } from './video.processor';
       }),
     }),
     BullModule.registerQueue({ name: 'video-processing' }),
-    TypeOrmModule.forFeature([Video, Channel]),
+    TypeOrmModule.forFeature([Video, Channel, User]),
     StorageModule,
   ],
   providers: [VideoProcessor, VideosService],
