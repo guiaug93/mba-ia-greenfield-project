@@ -2,67 +2,137 @@ import { appendRandomSuffix, sanitizeNickname } from './nickname.util';
 
 describe('sanitizeNickname', () => {
   it('lowercases and strips invalid chars', () => {
-    const result = sanitizeNickname('Hello.World+Test');
-    expect(result).toBe('helloworldtest');
+    expect(sanitizeNickname('Hello.World+Test')).toBe('helloworldtest');
   });
 
   it('preserves underscores', () => {
-    const result = sanitizeNickname('john_doe');
-    expect(result).toBe('john_doe');
+    expect(sanitizeNickname('john_doe')).toBe('john_doe');
   });
 
   it('preserves digits', () => {
-    const result = sanitizeNickname('user123');
-    expect(result).toBe('user123');
+    expect(sanitizeNickname('user123')).toBe('user123');
   });
 
   it('truncates to 46 characters', () => {
-    const long = 'a'.repeat(60);
-    const result = sanitizeNickname(long);
-    expect(result.length).toBe(46);
+    expect(sanitizeNickname('a'.repeat(60))).toHaveLength(46);
   });
 
-  it('returns user_ + 8 random chars when result is empty', () => {
-    const result = sanitizeNickname('!!!---');
-    expect(result).toMatch(/^user_[a-z0-9]{8}$/);
+  it('returns user_ + 8 random hex when result is empty special chars', () => {
+    expect(sanitizeNickname('!!!---')).toMatch(/^user_[a-z0-9]{8}$/);
   });
 
-  it('returns user_ + 8 random chars for empty string', () => {
-    const result = sanitizeNickname('');
-    expect(result).toMatch(/^user_[a-z0-9]{8}$/);
+  it('returns user_ + 8 random hex for empty string', () => {
+    expect(sanitizeNickname('')).toMatch(/^user_[a-z0-9]{8}$/);
   });
 
-  it('produces different fallbacks on repeated empty-prefix calls', () => {
+  it('produces different fallbacks on repeated calls', () => {
     const a = sanitizeNickname('!!!');
     const b = sanitizeNickname('!!!');
     expect(a).toMatch(/^user_[a-z0-9]{8}$/);
     expect(b).toMatch(/^user_[a-z0-9]{8}$/);
   });
+
+  // ── Corner Cases ────────────────────────────────────────
+  it('strips all uppercase letters', () => {
+    expect(sanitizeNickname('JOHN')).toBe('john');
+  });
+
+  it('strips spaces', () => {
+    expect(sanitizeNickname('hello world')).toBe('helloworld');
+  });
+
+  it('strips hyphens', () => {
+    expect(sanitizeNickname('hello-world')).toBe('helloworld');
+  });
+
+  it('strips @ and domain', () => {
+    expect(sanitizeNickname('user@domain')).toBe('userdomain');
+  });
+
+  it('keeps mixed letters digits and underscores', () => {
+    expect(sanitizeNickname('a1_b2_c3')).toBe('a1_b2_c3');
+  });
+
+  it('returns only lowercase result from mixed case', () => {
+    expect(sanitizeNickname('AbCdEf')).toBe('abcdef');
+  });
+
+  it('handles exactly 46 chars input', () => {
+    const input = 'a'.repeat(46);
+    const result = sanitizeNickname(input);
+    expect(result).toBe(input);
+    expect(result.length).toBe(46);
+  });
+
+  it('handles exactly 47 chars input (truncates to 46)', () => {
+    const input = 'a'.repeat(47);
+    expect(sanitizeNickname(input)).toHaveLength(46);
+  });
+
+  it('handles single character input', () => {
+    expect(sanitizeNickname('x')).toBe('x');
+  });
+
+  it('handles input with only allowed chars', () => {
+    expect(sanitizeNickname('abcdef123456_xyz')).toBe('abcdef123456_xyz');
+  });
+
+  it('fallback nickname always starts with user_', () => {
+    for (let i = 0; i < 5; i++) {
+      expect(sanitizeNickname('!!!')).toMatch(/^user_/);
+    }
+  });
+
+  it('fallback nickname has exactly 13 chars', () => {
+    expect(sanitizeNickname('!!!')).toHaveLength(13);
+  });
 });
 
 describe('appendRandomSuffix', () => {
-  it('appends underscore and 3 alphanumeric chars', () => {
-    const result = appendRandomSuffix('john');
-    expect(result).toMatch(/^john_[a-z0-9]{3}$/);
+  it('appends underscore and 3 hex chars', () => {
+    expect(appendRandomSuffix('john')).toMatch(/^john_[a-z0-9]{3}$/);
   });
 
-  it('keeps total length at most 50 chars', () => {
-    const long = 'a'.repeat(46);
-    const result = appendRandomSuffix(long);
-    expect(result.length).toBe(50);
+  it('total length at most 50 chars', () => {
+    expect(appendRandomSuffix('a'.repeat(46))).toHaveLength(50);
   });
 
-  it('truncates base to 46 before appending suffix', () => {
-    const long = 'a'.repeat(60);
-    const result = appendRandomSuffix(long);
-    expect(result.length).toBe(50);
+  it('truncates base to 46 before appending', () => {
+    const result = appendRandomSuffix('a'.repeat(60));
+    expect(result).toHaveLength(50);
     expect(result).toMatch(/^a{46}_[a-z0-9]{3}$/);
   });
 
-  it('produces only lowercase letters and digits in suffix', () => {
-    for (let i = 0; i < 10; i++) {
-      const result = appendRandomSuffix('base');
-      expect(result).toMatch(/^base_[a-z0-9]{3}$/);
-    }
+  it('only lowercase letters and digits in suffix', () => {
+    Array.from({ length: 10 }).forEach(() => {
+      expect(appendRandomSuffix('base')).toMatch(/^base_[a-z0-9]{3}$/);
+    });
+  });
+
+  // ── Corner Cases ────────────────────────────────────────
+  it('works with short base name', () => {
+    expect(appendRandomSuffix('a')).toMatch(/^a_[a-z0-9]{3}$/);
+  });
+
+  it('works with single char base', () => {
+    expect(appendRandomSuffix('x')).toMatch(/^x_[a-z0-9]{3}$/);
+  });
+
+  it('works with base containing underscores', () => {
+    expect(appendRandomSuffix('hello_world')).toMatch(
+      /^hello_world_[a-z0-9]{3}$/,
+    );
+  });
+
+  it('suffix varies between calls', () => {
+    const results = new Set(
+      Array.from({ length: 5 }, () => appendRandomSuffix('base')),
+    );
+    expect(results.size).toBeGreaterThan(1);
+  });
+
+  it('base is preserved exactly when under 46 chars', () => {
+    const result = appendRandomSuffix('hello');
+    expect(result.startsWith('hello_')).toBe(true);
   });
 });

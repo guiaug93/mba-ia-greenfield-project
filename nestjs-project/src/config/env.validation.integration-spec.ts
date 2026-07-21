@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { envValidationSchema } from './env.validation';
 
 const requiredEnv = {
@@ -6,6 +7,8 @@ const requiredEnv = {
   DB_NAME: 'db',
   JWT_SECRET: 'secret',
   JWT_REFRESH_SECRET: 'refresh-secret',
+  MINIO_ACCESS_KEY: 'minio',
+  MINIO_SECRET_KEY: 'minio123',
 };
 
 const validate = (env: Record<string, string>) =>
