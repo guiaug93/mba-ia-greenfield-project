@@ -97,7 +97,11 @@
 - **Pros:** SEO-friendly URLs. Human-readable — user sees the title in the URL. Two access paths: slug for public sharing, UUID for canonical internal use. Streaming is efficient (direct to MinIO).
 - **Cons:** Slug management adds complexity — uniqueness checking and deduplication logic. Slug changes when the title changes (or stays frozen — needs a policy decision). More routes to maintain.
 
-**Recommendation:** **Option B (UUID v7 + Presigned GET Redirect)** — Efficiency is paramount for video streaming. Passing traffic through the API would defeat the purpose of direct-to-storage upload. UUID v7 is the primary key; a pre-signed GET URL redirects the client to MinIO for the actual bytes. SEO-friendly slugs can be added in Phase 04 (Gerenciamento de Vídeos) if needed.
+**Recommendation:** **Option B (UUID + Presigned GET Redirect)** — Efficiency is paramount for video streaming. Passing traffic through the API would defeat the purpose of direct-to-storage upload. The UUID is the primary key; a pre-signed GET URL redirects the client to MinIO for the actual bytes. SEO-friendly slugs can be added in Phase 04 (Gerenciamento de Vídeos) if needed.
+
+**UUID version — implemented as v4, not v7.** The options above were written around UUID v7 for its time-ordering property. The implementation uses `gen_random_uuid()` (`1782662824000-CreateVideosTable.ts`), which is **UUID v4**: PostgreSQL 17 — the version pinned in `compose.yaml` — ships no native `uuidv7()` (it lands in PostgreSQL 18), and adding an application-side v7 generator was not worth the dependency. The requirement this decision must satisfy is *unique and conflict-free*, which v4 meets in full; time-ordering was a nice-to-have for index locality, not a phase requirement. Chronological ordering is served by the `IDX_videos_created_at` index instead.
+
+**Decision:** B (UUID v4 via `gen_random_uuid()` + Presigned GET Redirect)
 
 ---
 
@@ -136,6 +140,6 @@
 |----|----------|---------------|--------|
 | TD-01 | Queue Technology | BullMQ | A (BullMQ) |
 | TD-02 | Upload Strategy | Multipart via Presigned URLs | B (Multipart Presigned URLs) |
-| TD-03 | Worker Architecture | Separate Container + fluent-ffmpeg | A (Separate Container) |
-| TD-04 | Unique URL & Streaming | UUID v7 + Presigned GET Redirect | B (UUID + Presigned Redirect) |
+| TD-03 | Worker Architecture | Separate Container + FFmpeg CLI via `child_process` | A (Separate Container, no npm wrapper) |
+| TD-04 | Unique URL & Streaming | UUID v4 (`gen_random_uuid()`) + Presigned GET Redirect | B (UUID + Presigned Redirect) |
 | TD-05 | Video Status Lifecycle | Three-state (pending → processing → ready/error) | A (Three-State) |
