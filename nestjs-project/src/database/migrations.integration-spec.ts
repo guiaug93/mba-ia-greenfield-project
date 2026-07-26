@@ -37,6 +37,15 @@ describe('Database migrations (integration)', () => {
       ),
       dataSource.query(`DROP TABLE IF EXISTS "migrations" CASCADE`),
     ]);
+
+    // Dropping "verification_tokens" does not drop the enum its column used:
+    // the table depends on the type, not the other way around, so CASCADE
+    // leaves the type behind. Without this, CreateAuthTokens.up() fails with
+    // 'type "verification_tokens_type_enum" already exists' on every run after
+    // the first (afterAll re-applies the migrations, recreating the type).
+    await dataSource.query(
+      `DROP TYPE IF EXISTS "public"."verification_tokens_type_enum"`,
+    );
   });
 
   afterAll(async () => {
