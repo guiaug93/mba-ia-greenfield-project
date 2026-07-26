@@ -42,7 +42,7 @@ What already exists and is functional:
 | Thumbnail generation | JPEG frame at 50% timestamp via FFmpeg |
 | Streaming | Presigned GET URL → 302 redirect → direct MinIO range requests |
 | Download | Same as streaming but triggers download header |
-| Status lifecycle | pending → processing → ready | error |
+| Status lifecycle | pending → processing → ready \| error |
 
 ## 4. Technical Decisions (from research)
 
@@ -50,8 +50,8 @@ What already exists and is functional:
 |----|----------|--------|
 | TD-01 | Queue Technology | BullMQ |
 | TD-02 | Upload Strategy | Multipart via Presigned URLs |
-| TD-03 | Worker Architecture | Separate Container + fluent-ffmpeg |
-| TD-04 | Unique URL & Streaming | UUID v7 + Presigned GET Redirect |
+| TD-03 | Worker Architecture | Separate Container + FFmpeg CLI via `child_process` |
+| TD-04 | Unique URL & Streaming | UUID v4 (`gen_random_uuid()`) + Presigned GET Redirect |
 | TD-05 | Video Status Lifecycle | Three-state (pending → processing → ready/error) |
 
 Full reasoning: `docs/decisions/technical-decisions-phase-03-videos.md`

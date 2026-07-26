@@ -21,7 +21,7 @@ This is a monorepo with two main areas:
   - **Mail** – email sending via SMTP (mailpit in dev)
 
 - `docs/` — Project documentation, architecture diagrams, and planning.
-- `next-frontend/` (Next.js) — not yet initialized
+- `next-frontend/` (Next.js) — frontend from Phases 01–02 (config base, auth screens, MSW mocks, Playwright/Vitest suites). The video UI is out of scope for Phase 03.
 
 ## Architecture (C4 Container Diagram)
 

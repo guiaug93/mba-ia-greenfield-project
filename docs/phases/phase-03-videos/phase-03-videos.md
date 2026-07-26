@@ -423,7 +423,9 @@ Error response format (inherited from Phase 02):
 | FILE_SIZE_EXCEEDED | 409 | File size exceeds the maximum allowed size of 10GB | POST /videos with fileSize > 10737418240 |
 | INVALID_VIDEO_STATUS | 409 | Video status does not allow this operation | POST /videos/:id/complete on non-pending video |
 | VIDEO_NOT_READY | 409 | Video is not ready for streaming | GET /videos/:id/stream on non-ready video |
-| VIDEO_NOT_FOUND | 404 | Video not found | GET /videos/:id with non-existent UUID |
+| VIDEO_NOT_FOUND | 404 | Video not found | GET /videos/:id with non-existent UUID; also returned when an authenticated user targets a video owned by another channel (ownership failure is masked as 404 so the endpoint does not leak existence) |
+| CHANNEL_NOT_FOUND | 404 | Channel not found | Any authenticated video endpoint when the JWT subject has no channel |
+| UNAUTHORIZED | 401 | Unauthorized | Any endpoint marked "Required" in the Authorization Matrix, called without a valid access token (global `JwtAuthGuard`) |
 
 ---
 
@@ -443,18 +445,21 @@ SI-03.1 (no deps)  ← Infrastructure: Compose + Dockerfile + npm install
 │   ├── SI-03.3    ← Storage Service + Videos Service (depends on entity + modules)
 │   │   ├── SI-03.4  ← Upload API Endpoints (depends on services)
 │   │   │   └── SI-03.5  ← Video Worker (depends on upload API + services)
-│   │   └── SI-03.6  ← Streaming + Download (depends on services)
+│   │   │       └── SI-03.6  ← Streaming + Download (depends on SI-03.5, SI-03.3, SI-03.2)
 ```
+
+SI-03.6 hangs off SI-03.5 because streaming is only reachable once the worker has
+moved a video to `ready` — the stream and download endpoints reject any other status.
 
 ## Deliverables
 
-- [ ] All 6 SIs implemented and their tests pass
-- [ ] Full test suite passes: `npm test` (unit + integration)
-- [ ] E2E tests pass: `npm run test:e2e`
-- [ ] Type-check passes: `npx tsc --noEmit` (code 0)
-- [ ] Lint passes: `npm run lint`
-- [ ] Project builds: `npm run build`
-- [ ] `Dockerfile.worker` builds without errors
-- [ ] `compose.yaml` starts all 6 services (db, mailpit, minio, redis, nestjs-api, video-worker)
-- [ ] CLAUDE.md updated with video module, endpoints, and infrastructure
-- [ ] `docs/phases/phase-03-videos/progress.md` created and reflects completed SIs
+- [x] All 6 SIs implemented and their tests pass
+- [x] Full test suite passes: `npm test` (unit + integration) — 250 tests / 33 suites
+- [x] E2E tests pass: `npm run test:e2e` — 60 tests / 4 suites
+- [x] Type-check passes: `npx tsc --noEmit` (code 0)
+- [x] Lint passes: `npm run lint`
+- [x] Project builds: `npm run build`
+- [x] `Dockerfile.worker` builds without errors
+- [x] `compose.yaml` starts all 6 services (db, mailpit, minio, redis, nestjs-api, video-worker)
+- [x] CLAUDE.md updated with video module, endpoints, and infrastructure
+- [x] `docs/phases/phase-03-videos/progress.md` created and reflects completed SIs

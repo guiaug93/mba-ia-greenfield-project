@@ -23,8 +23,8 @@ Comparing `docs/project-plan.md`, `docs/decisions/technical-decisions-phase-03-v
 |-------------------|--------|-------|
 | Queue technology | ✅ TD-01 | BullMQ chosen, justified |
 | Upload strategy for 10GB | ✅ TD-02 | Multipart presigned URLs for >5GB, single PUT for ≤5GB |
-| Worker architecture | ✅ TD-03 | Separate container, fluent-ffmpeg, Node.js |
-| Unique URL & streaming | ✅ TD-04 | UUID v7 PK, presigned GET redirect for streaming |
+| Worker architecture | ✅ TD-03 | Separate container, FFmpeg CLI via `child_process` (no npm wrapper), Node.js |
+| Unique URL & streaming | ✅ TD-04 | UUID v4 PK (`gen_random_uuid()`), presigned GET redirect for streaming |
 | Status lifecycle | ✅ TD-05 | Three states: pending → processing → ready/error |
 | Object storage bucket organization | ✅ (context.md) | `videos/{uuid}/` and `thumbnails/{uuid}/` |
 | File size limits (per part, total) | ✅ (implicit) | ≤5GB single PUT, multipart up to 5TiB, part size 50MB |
@@ -58,8 +58,8 @@ Comparing `docs/project-plan.md`, `docs/decisions/technical-decisions-phase-03-v
 | Processing failure → `error` with message | `status_message` column stores the error | Yes — TD-05 mentions error message |
 | Concurrent uploads by same user | Multiple videos can be in `pending` simultaneously | No constraint needed — each is independent |
 | Multipart part size selection | Part size must balance parallelism vs overhead | Default: 50MB (100 parts for 5GB, 200 parts for 10GB) — practical |
-| MinIO bucket auto-creation | Buckets must exist before first upload | Startup script or API init creates buckets | Requires implementation detail |
-| Worker sidecar DB access | Worker needs DB credentials | Same env vars as API (DB_HOST=db) | Works in Docker network |
+| MinIO bucket auto-creation | Buckets must exist before first upload | Yes — `BucketsService` creates them on API startup |
+| Worker sidecar DB access | Worker needs DB credentials | Yes — same env vars as the API (`DB_HOST=db`), works over the Docker network |
 
 ## 6. Additional Outputs
 
@@ -76,6 +76,6 @@ Comparing `docs/project-plan.md`, `docs/decisions/technical-decisions-phase-03-v
 
 ---
 
-## Veredict
+## Verdict
 
 ✅ **Clean** — All decisions are complete, no inconsistencies, no ambiguity blocks, no dependency gaps. The phase is ready for plan generation.

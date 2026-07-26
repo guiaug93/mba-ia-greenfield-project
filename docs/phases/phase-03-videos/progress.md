@@ -35,7 +35,47 @@
 
 ## Code Quality
 - **tsc --noEmit:** PASS (exit 0)
-- **npm run lint:** PASS (0 errors, 0 warnings)
-- **npm test (unit):** 81/81 PASS (17 suites)
+- **npm run lint:** PASS (exit 0)
+- **npm test (unit + integração):** 250/250 PASS (33 suites). `testRegex` cobre `*.spec.ts` **e** `*.integration-spec.ts`, então `npm test` não é uma suíte só de unit — exige a stack do Compose no ar (Postgres, Redis, MinIO, Mailpit). Rodar com `--runInBand`.
+- **npm run test:e2e:** 60/60 PASS (4 suites: `app`, `auth`, `swagger`, `videos`)
+- **Testes da Fase 03 especificamente** (`src/videos`, `src/storage`, `src/video-worker`): 79/79 PASS em 10 suites
+- **Idempotência:** a suíte completa foi executada duas vezes seguidas contra o mesmo banco, verde nas duas
 - **Domain exceptions:** VideosService and ChannelsService use domain exceptions (not HTTP exceptions)
 - **DTOs:** CreateVideoDto and CompleteUploadDto with class-validator decorators
+
+## Infraestrutura verificada
+
+`docker compose up -d` sobe os 6 serviços a partir de um clone limpo:
+
+| Serviço | Verificação |
+|---------|-------------|
+| `db` (postgres:17) | `pg_isready -U streamtube` → accepting connections |
+| `redis` (redis:7-alpine) | `redis-cli ping` → PONG |
+| `minio` | `/minio/health/live` → 200 |
+| `mailpit` | healthy |
+| `nestjs-api` | bootstrap OK; `GET /` → 200 |
+| `video-worker` | log `Video worker started, waiting for jobs...`; ffmpeg 8.1.2 + ffprobe 8.1.2 na imagem |
+
+O `video-worker` **não** monta o diretório do host: o `dist/` vem do `npm run build`
+executado dentro da imagem (`Dockerfile.worker`). Confirmado removendo o `dist/` do
+host e recriando o container — sobe igual.
+
+## Limitações conhecidas
+
+Registradas aqui por rastreabilidade; nenhuma bloqueia os entregáveis da fase.
+
+- **O teto de 10GB é declarativo.** `@Max` em `CreateVideoDto.fileSize` valida o valor
+  que o cliente *declara*, não o tamanho real no storage. `StorageService.getObjectMetadata`
+  existe mas não é usado no `POST /videos/:id/complete` para conferir o `contentLength`,
+  e `partCount` não tem teto. O requisito da fase — não passar os bytes pela API — é
+  atendido integralmente; a checagem do tamanho real fica para Fase 04.
+- **`status` é `varchar(20)` sem CHECK constraint.** O enum `VideoStatus` só é garantido
+  pela aplicação; o banco aceita qualquer string ≤20 chars.
+- **A relação Channel↔Video é unidirecional.** Falta o `@OneToMany` em `Channel`, contra
+  a rule `nestjs-entities.md`.
+- **Cobertura de teste com lacunas:** não há `videos.controller.spec.ts`; o caminho feliz
+  de `/stream` e `/download` (vídeo já `ready`) e o `POST /videos/:id/abort` não são
+  exercitados — o e2e nunca chega a `ready` porque o worker não roda durante os testes.
+- **`GET /videos/:id/thumbnail` responde com chaves diferentes** conforme o caso:
+  `{ url }` quando há thumbnail e `{ thumbnailUrl: null }` quando não há.
+- **`Content-Disposition` do download usa `video.title` cru** e extensão `.mp4` fixa.
