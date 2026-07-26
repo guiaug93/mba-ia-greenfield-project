@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { ArgumentsHost } from '@nestjs/common';
 import { DomainExceptionFilter } from './domain-exception.filter';
 import {
@@ -27,8 +28,14 @@ describe('DomainExceptionFilter', () => {
       }),
       getArgs: () => [],
       getArgByIndex: () => null,
-      switchToRpc: () => ({}) as any,
-      switchToWs: () => ({}) as any,
+      switchToRpc: () => ({
+        getData: () => ({}),
+        getContext: () => ({}),
+      }),
+      switchToWs: () => ({
+        getData: () => ({}),
+        getClient: () => ({}),
+      }),
       getType: () => 'http',
     } as unknown as ArgumentsHost;
   });

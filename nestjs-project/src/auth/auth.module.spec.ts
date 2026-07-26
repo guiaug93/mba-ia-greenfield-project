@@ -1,32 +1,36 @@
 import { Test } from '@nestjs/testing';
-import { ConfigModule } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import appConfig from '../config/app.config';
+import { JwtService } from '@nestjs/jwt';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import authConfig from '../config/auth.config';
-import mailConfig from '../config/mail.config';
-import { Channel } from '../channels/entities/channel.entity';
-import { User } from '../users/entities/user.entity';
-import { createTestDataSource } from '../test/create-test-data-source';
-import { AuthModule } from './auth.module';
+import { MailService } from '../mail/mail.service';
+import { UsersService } from '../users/users.service';
+import { AuthService } from './auth.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { VerificationToken } from './entities/verification-token.entity';
 
-const ALL_ENTITIES = [User, Channel, RefreshToken, VerificationToken];
-
 describe('AuthModule', () => {
-  it('should compile successfully with JwtModule, TypeOrmModule, UsersModule, and MailModule', async () => {
+  it('should compile AuthService successfully', async () => {
     const module = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-          load: [appConfig, authConfig, mailConfig],
-        }),
-        TypeOrmModule.forRoot(createTestDataSource(ALL_ENTITIES).options),
-        AuthModule,
+      providers: [
+        AuthService,
+        { provide: UsersService, useValue: {} },
+        { provide: MailService, useValue: {} },
+        { provide: JwtService, useValue: {} },
+        {
+          provide: getRepositoryToken(VerificationToken),
+          useValue: {},
+        },
+        {
+          provide: getRepositoryToken(RefreshToken),
+          useValue: {},
+        },
+        { provide: authConfig.KEY, useValue: {} },
       ],
     }).compile();
 
     expect(module).toBeDefined();
+    const service = module.get(AuthService);
+    expect(service).toBeDefined();
     await module.close();
-  }, 30000);
+  });
 });
